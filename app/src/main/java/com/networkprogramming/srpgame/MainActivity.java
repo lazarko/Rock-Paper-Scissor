@@ -1,5 +1,6 @@
 package com.networkprogramming.srpgame;
 
+import android.os.AsyncTask;
 import android.os.StrictMode;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -24,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     TextView textResponse;
     TextView scoreText;
     public int SCORE_INT;
+    Communication comm;
 
     public final static String ROCK_STR = "ROCK";
     public final static String SCISSOR_STR = "SCISSOR";
@@ -32,12 +34,12 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-    String dstAddress = "10.91.196.185" ;
+    String dstAddress = "192.168.161.29";
     int dstPort = 9393;
     Socket clientSocket;
     PrintWriter toClient;
     BufferedReader fromClient;
-    String input;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,15 +47,6 @@ public class MainActivity extends AppCompatActivity {
         StrictMode.ThreadPolicy p = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(p);
 
-        try{
-            clientSocket = new Socket(dstAddress, dstPort);
-            fromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            toClient = new PrintWriter(clientSocket.getOutputStream(), false);
-            SCORE_INT = 0;
-
-        }catch(IOException e){
-            e.printStackTrace();
-        }
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -69,8 +62,8 @@ public class MainActivity extends AppCompatActivity {
         quitBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                toClient.println(QUIT_STR);
-                toClient.flush();
+                comm = new Communication();
+                comm.execute(QUIT_STR);
                 finish();
             }
         });
@@ -78,28 +71,16 @@ public class MainActivity extends AppCompatActivity {
         rockBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMsg(ROCK_STR);
-                try{
-                    input = fromClient.readLine();
-                    textResponse.setText(input);
-                    setScore(input);
-                }catch (IOException e){
-                    e.printStackTrace();
-                }
+                comm = new Communication();
+                comm.execute(ROCK_STR);
             }
         });
 
         paperBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMsg(PAPER_STR);
-                try{
-                    input = fromClient.readLine();
-                    textResponse.setText(input);
-                    setScore(input);
-                }catch (IOException e){
-                    e.printStackTrace();
-                }
+                comm = new Communication();
+                comm.execute(PAPER_STR);
 
             }
         });
@@ -107,18 +88,25 @@ public class MainActivity extends AppCompatActivity {
         scissorBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMsg(SCISSOR_STR);
-                try{
-                    input = fromClient.readLine();
-                    textResponse.setText(input);
-                    setScore(input);
-                }catch(IOException e){
-                    e.printStackTrace();
-                }
+                comm = new Communication();
+                comm.execute(SCISSOR_STR);
+
             }
         });
 
 
+    }
+
+    public void setScore(String msg){
+        if("WIN".equalsIgnoreCase(msg)){
+            SCORE_INT++;
+            scoreText.setText(Integer.toString(SCORE_INT));
+        }else if("LOSE".equalsIgnoreCase(msg)){
+            SCORE_INT--;
+            scoreText.setText(Integer.toString(SCORE_INT));
+        }else{
+            scoreText.setText(Integer.toString(SCORE_INT));
+        }
     }
 
     public void onResume(){
@@ -135,19 +123,50 @@ public class MainActivity extends AppCompatActivity {
         Process.killProcess(Process.myPid());
         super.onDestroy();
     }
-    public void setScore(String msg){
-        if("WIN".equalsIgnoreCase(msg)){
-            SCORE_INT++;
-            scoreText.setText(Integer.toString(SCORE_INT));
-        }else if("LOSE".equalsIgnoreCase(msg)){
-            SCORE_INT--;
-            scoreText.setText(Integer.toString(SCORE_INT));
-        }else{
-            scoreText.setText(Integer.toString(SCORE_INT));
+
+
+    class Communication extends AsyncTask<String, String, String> {
+
+        @Override
+        protected void onPreExecute() {
+            try {
+                clientSocket = new Socket(dstAddress, dstPort);
+                fromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                toClient = new PrintWriter(clientSocket.getOutputStream(), false);
+                SCORE_INT = 0;
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+            String message = params[0];
+            if (message.equalsIgnoreCase(QUIT_STR)) {
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            }
+            toClient.println(message);
+            toClient.flush();
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            try{
+                String inputFromServer = fromClient.readLine();
+                textResponse.setText(inputFromServer);
+                setScore(inputFromServer);
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+
         }
     }
-    public void sendMsg(String msg){
-        toClient.println(msg);
-        toClient.flush();
-    }
+
 }
